@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  overflow-x: hidden;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+  color: #ea580c;
+}
+
+.swiper-pagination-bullet-active {
+  background: #ea580c;
+}
