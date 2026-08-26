@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -6,23 +7,27 @@ import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+import { FLUENT_FORM_ID, FLUENT_FORM_NONCE, FLUENT_FORMS_URL, INITIAL_SLOTS, OFFER_END_DATE, PAGE_URL, WHATSAPP_NUMBER } from "./constants";
+import { OFFER_END_COPY, OFFER_END_SHORT } from "./utils/formatDate";
+import { getSmartTimeLabel } from "./utils/getTimeLabel";
+import { decrementSlot, getSlotsRemaining } from "./utils/slots";
 
-const OFFER_END_DATE = new Date("2026-08-25T23:59:00+01:00");
-const INITIAL_SLOTS = 20;
-const WHATSAPP_NUMBER = "2348182126524";
-const PAGE_URL = "https://example.com/abraham-50000-website-offer";
-const FLUENT_FORMS_URL = "https://[YOUR-WORDPRESS-SITE]/?fluentform_pages&form_id=[YOUR_FORM_ID]";
-const FLUENT_FORM_ID = "[YOUR_FORM_ID]";
-const FLUENT_FORM_NONCE = "[NONCE]";
 const easeOut = [0.22, 1, 0.36, 1];
 
+const revealUp = {
+  initial: { opacity: 0, y: 40 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-100px" },
+  transition: { duration: 0.7, ease: easeOut },
+};
+
 const faqs = [
-  ["Is ₦50,000 really the full price?", "Yes. For this 48-hour window, it covers the complete website package listed here. No hidden setup charge is added."],
+  ["Is ₦50,000 really the full price?", "Yes. For this window, it covers the complete website package listed here. No hidden setup charge is added."],
   ["Will Abraham build it personally?", "Yes. Abraham reviews your business, plans your pages, and builds the website himself."],
   ["How long will my website take?", "After payment and content confirmation, Abraham will agree a practical timeline with you on WhatsApp."],
   ["Do I need to already have a domain?", "No. Domain and hosting are included in this package, with the final name confirmed after your slot is paid."],
   ["Can I pay after the website is done?", "No. The slot is confirmed by payment because only 20 spaces are available."],
-  ["What happens after the 48 hours?", "The offer closes and the standard website price returns to ₦350,000. The countdown is fixed and does not reset."],
+  ["What happens after the offer closes?", "The offer closes and the standard website price returns to ₦350,000. The countdown is fixed and does not reset."],
   ["How do I know my slot is actually reserved?", "Your form submission holds it for 30 minutes. Payment confirms it permanently. Abraham sends a WhatsApp message to confirm."],
   ["What if I'm outside Lagos?", "Abraham builds websites remotely. Location does not matter. He works with businesses across Nigeria."],
 ];
@@ -61,15 +66,15 @@ const testimonials = [
   },
 ];
 
-const revealUp = {
-  initial: { opacity: 0, y: 40 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-100px" },
-  transition: { duration: 0.7, ease: easeOut },
-};
+const WEBSITE_SAMPLES = [
+  { name: "Genius Quest Hub", url: "https://geniusquesthub.com", category: "Education", location: "UK", image: "/images/genius-quest-hub.webp" },
+  { name: "Skills Air", url: "https://skillsair.com", category: "EdTech", location: "Lagos, Nigeria", image: "/images/skills-air.png" },
+  { name: "Bezal Homes", url: "https://bezalhomes.ng", category: "Real Estate", location: "Lagos, Nigeria", image: "/images/bezal-homes.png" },
+];
 
 function useCountdown(targetDate) {
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, expired: false });
+
   useEffect(() => {
     const tick = () => {
       const diff = targetDate - new Date();
@@ -88,13 +93,24 @@ function useCountdown(targetDate) {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [targetDate]);
+
   return timeLeft;
+}
+
+function useSmartLabel() {
+  const [label, setLabel] = useState(() => getSmartTimeLabel(OFFER_END_DATE));
+  useEffect(() => {
+    const interval = setInterval(() => setLabel(getSmartTimeLabel(OFFER_END_DATE)), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  return label;
 }
 
 function useCountUp(target, duration = 1600) {
   const reduced = useReducedMotion();
   const { ref, inView } = useInView({ once: true });
   const [count, setCount] = useState(reduced ? target : 0);
+
   useEffect(() => {
     if (!inView || reduced) return;
     let current = 0;
@@ -110,6 +126,7 @@ function useCountUp(target, duration = 1600) {
     }, 16);
     return () => clearInterval(timer);
   }, [duration, inView, reduced, target]);
+
   return { ref, count };
 }
 
@@ -117,8 +134,12 @@ function pad(value) {
   return String(value).padStart(2, "0");
 }
 
+function scrollToId(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+}
+
 function scrollToForm() {
-  document.getElementById("reservation-form")?.scrollIntoView({ behavior: "smooth" });
+  scrollToId("reservation-form");
 }
 
 function CountdownText({ timeLeft }) {
@@ -127,15 +148,14 @@ function CountdownText({ timeLeft }) {
 
 function CalendarReminderButton({ dark = false }) {
   const downloadCalendarReminder = () => {
-    const offerEnd = OFFER_END_DATE;
-    const reminderTime = new Date(offerEnd.getTime() - 6 * 60 * 60 * 1000);
+    const reminderTime = new Date(OFFER_END_DATE.getTime() - 6 * 60 * 60 * 1000);
     const format = (date) => date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const icsContent = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
       "BEGIN:VEVENT",
       `DTSTART:${format(reminderTime)}`,
-      `DTEND:${format(offerEnd)}`,
+      `DTEND:${format(OFFER_END_DATE)}`,
       "SUMMARY:Abraham's ₦50k Website Offer - Closing Soon!",
       `DESCRIPTION:Abraham Akinwumi's ₦50,000 website offer closes soon. Visit ${PAGE_URL} or chat Abraham: https://wa.me/${WHATSAPP_NUMBER}`,
       `URL:${PAGE_URL}`,
@@ -150,6 +170,7 @@ function CalendarReminderButton({ dark = false }) {
     a.click();
     URL.revokeObjectURL(url);
   };
+
   return (
     <button onClick={downloadCalendarReminder} className={`mt-4 rounded-full border px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5 hover:brightness-110 ${dark ? "border-white/70 text-white" : "border-purple-bright text-purple-bright"}`}>
       ⏰ Remind Me Before the Offer Ends
@@ -166,13 +187,14 @@ function CtaButton({ expired, children = "→ Reserve My Slot Now", variant = "o
       </a>
     );
   }
+
   return (
     <motion.button
       onClick={scrollToForm}
       animate={reduced ? undefined : { scale: [1, 1.04, 1] }}
       whileHover={{ scale: 1.03, y: -2, boxShadow: "0 12px 40px rgba(234,88,12,0.4)" }}
       transition={reduced ? { duration: 0 } : { repeat: Infinity, duration: 2.5 }}
-      className={`rounded-full px-10 py-4 text-base font-semibold uppercase tracking-[0.04em] transition ${variant === "white" ? "bg-white text-purple-mid ring-2 ring-orange-warm" : "bg-gradient-to-r from-orange-fire to-orange-warm text-white shadow-xl"}`}
+      className={`cta-button rounded-full px-10 py-4 text-base font-semibold uppercase tracking-[0.04em] transition ${variant === "white" ? "bg-white text-purple-mid ring-2 ring-orange-warm" : "bg-gradient-to-r from-orange-fire to-orange-warm text-white shadow-xl"}`}
     >
       {children}
     </motion.button>
@@ -181,18 +203,74 @@ function CtaButton({ expired, children = "→ Reserve My Slot Now", variant = "o
 
 function UrgencyBar({ slotsRemaining, timeLeft }) {
   const reduced = useReducedMotion();
+  const smartLabel = useSmartLabel();
   return (
     <motion.div initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.6 }} className="fixed left-0 top-0 z-[100] flex h-11 w-full items-center justify-center bg-[linear-gradient(90deg,#3D0066,#9333EA,#3D0066)] bg-[length:200%_200%] px-4 text-sm font-semibold text-white shadow-lg animate-shimmer">
       <div className="hidden flex-1 items-center gap-2 md:flex">
         <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-dot-pulse" />
-        <span>{slotsRemaining} of 20 slots remaining</span>
+        <span>{slotsRemaining} of 20 slots remaining · {smartLabel}</span>
       </div>
       <div className="flex flex-1 items-center justify-center gap-2">
-        <span>⚡ OFFER CLOSES IN:</span>
+        <span>⚡ OFFER CLOSES:</span>
         <CountdownText timeLeft={timeLeft} />
+        <span className="hidden text-white/70 sm:inline">· {OFFER_END_SHORT}</span>
       </div>
       <button onClick={scrollToForm} className="hidden flex-1 justify-end text-right text-orange-warm md:flex">→ Reserve Now</button>
     </motion.div>
+  );
+}
+
+function NavBar() {
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navItems = [
+    { label: "FAQs", target: "faq-section" },
+    { label: "Reserve My Slot", target: "reservation-form", highlight: true },
+    { label: "50k Website Features", target: "offer-box" },
+    { label: "Website Samples", target: "website-samples" },
+  ];
+
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 10);
+    handler();
+    window.addEventListener("scroll", handler);
+    return () => window.removeEventListener("scroll", handler);
+  }, []);
+
+  const goTo = (id) => {
+    scrollToId(id);
+    setMobileOpen(false);
+  };
+
+  return (
+    <nav className={`fixed left-0 right-0 top-11 z-[90] border-b border-purple-bright/30 backdrop-blur-xl transition ${scrolled ? "bg-purple-deep/95" : "bg-purple-deep/85"}`}>
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+        <span className="text-base font-bold text-white tracking-[-0.01em]">Abraham<span className="text-orange-fire">.</span></span>
+        <div className="desktop-nav flex items-center gap-2">
+          {navItems.map((item) => (
+            <button
+              key={item.target}
+              onClick={() => goTo(item.target)}
+              className={`rounded-lg px-3.5 py-2 text-sm transition hover:bg-purple-bright/20 hover:text-white ${item.highlight ? "rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-5 font-semibold text-white" : "font-medium text-light-text/85"}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <button className="mobile-nav-toggle hidden rounded-lg border border-purple-bright/50 px-3 py-2 text-lg text-white" onClick={() => setMobileOpen((value) => !value)}>
+          {mobileOpen ? "✕" : "☰"}
+        </button>
+      </div>
+      {mobileOpen && (
+        <div className="border-t border-purple-bright/20 bg-purple-deep/95 px-6 py-4">
+          {navItems.map((item) => (
+            <button key={item.target} onClick={() => goTo(item.target)} className={`block w-full border-b border-purple-bright/10 py-3 text-left text-base ${item.highlight ? "font-semibold text-orange-warm" : "text-light-text/90"}`}>
+              {item.highlight ? "→ " : ""}{item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </nav>
   );
 }
 
@@ -232,35 +310,43 @@ function SlotCard({ slotsRemaining, timeLeft }) {
       <div className="my-7 h-px bg-purple-bright/30" />
       <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.12em] text-orange-warm">Offer closes in</div>
       <CountdownBoxes timeLeft={timeLeft} />
-      <p className="mt-5 text-center text-sm leading-relaxed text-light-text/80">After this, price returns to ₦350,000. No exceptions.</p>
+      <p className="mt-5 text-center text-sm leading-relaxed text-light-text/80">Offer ends {OFFER_END_COPY} at midnight. No exceptions.</p>
     </motion.div>
   );
 }
 
 function HeroSection({ slotsRemaining, timeLeft }) {
   const reduced = useReducedMotion();
+  const smartLabel = useSmartLabel();
   const item = (delay) => reduced ? {} : { initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7, ease: easeOut, delay } };
+
   return (
     <section className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0 z-0 bg-cover bg-[center_top] bg-no-repeat" style={{ backgroundImage: "url('/images/header-bg.png')" }} />
       <div className="absolute inset-0 z-[1] bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/images/header-layer.png')" }} />
       <div className="absolute inset-0 z-[1] bg-[linear-gradient(to_right,rgba(61,0,102,0.88)_0%,rgba(61,0,102,0.54)_55%,rgba(26,0,48,0.38)_100%)]" />
-      <div className="relative z-[2] mx-auto grid max-w-6xl gap-10 px-6 pt-28 pb-20 md:min-h-screen md:grid-cols-[55fr_45fr] md:items-center">
-        <div>
-          <motion.div {...item(0)} className="inline-flex rounded-full bg-orange-fire px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-white">⚠️ 48 Hours Only · 20 Slots · A Personal Offer from Abraham</motion.div>
+      <div className="relative z-[2] mx-auto grid max-w-6xl gap-10 px-6 pb-20 pt-[132px] md:min-h-screen md:grid-cols-[55fr_45fr] md:items-center">
+        <div className="hero-left-column">
+          <motion.div {...item(0)} className="pre-badge inline-flex flex-wrap justify-center rounded-full bg-orange-fire px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-white">
+            <span>⚠️ {smartLabel}</span><span className="mx-2 text-white/60">·</span><span>20 Slots</span><span className="mx-2 text-white/60">·</span><span>A Personal Offer from Abraham</span>
+          </motion.div>
           <motion.h1 {...item(0.15)} className="mt-6 max-w-3xl text-[clamp(3rem,5vw,3.5rem)] font-bold leading-[0.95] tracking-[-0.02em] text-white">
             I Want to <span className="italic text-orange-fire drop-shadow-[0_0_30px_rgba(234,88,12,0.6)]">Give</span><br />Your Business a Website.<br />
             <span className="text-[1.2rem] font-normal tracking-normal text-light-text md:text-2xl">Not sell you one.</span>
           </motion.h1>
-          <motion.p {...item(0.3)} className="mt-6 max-w-[480px] text-[1.0625rem] leading-[1.75] text-light-text">
-            For 48 hours, I'm opening 20 slots to build complete, professional websites for small businesses at ₦50,000. Not a discount. A genuine decision to help businesses that deserve a proper website but couldn't afford one.
-          </motion.p>
+          <motion.div {...item(0.3)} className="hero-subtext-box relative mt-4 mb-2 inline-block rounded-xl border border-transparent bg-[linear-gradient(#1A0030,#1A0030)_padding-box,linear-gradient(135deg,#9333EA,#EA580C,#9333EA)_border-box] px-7 py-5 shadow-[inset_0_0_30px_rgba(147,51,234,0.08),0_4px_20px_rgba(0,0,0,0.2)]">
+            <span className="absolute -left-px -top-px h-4 w-4 rounded-tl-sm border-l-[3px] border-t-[3px] border-orange-fire" />
+            <span className="absolute -bottom-px -right-px h-4 w-4 rounded-br-sm border-b-[3px] border-r-[3px] border-orange-fire" />
+            <p className="m-0 max-w-[480px] text-[1.0625rem] leading-[1.75] text-light-text">
+              Until {OFFER_END_SHORT}, I'm opening 20 slots to build complete, professional websites for small businesses at ₦50,000. Not a discount. A genuine decision to help businesses that deserve a proper website but couldn't afford one.
+            </p>
+          </motion.div>
           <motion.div {...item(0.45)} className="mt-7 grid max-w-md grid-cols-2 gap-5">
             <div><div className="text-xl font-medium text-light-text/45 line-through">₦350,000</div><div className="mt-1 text-xs uppercase tracking-[0.12em] text-light-text/80">Normal Market Price</div></div>
             <div><div className="text-[clamp(2rem,5vw,3rem)] font-bold leading-none text-orange-fire drop-shadow-[0_0_20px_rgba(234,88,12,0.5)]">₦50,000</div><div className="mt-1 text-xs uppercase tracking-[0.12em] text-orange-warm">Your Price Today</div></div>
           </motion.div>
           <motion.div {...item(0.6)} className="mt-8"><CtaButton expired={timeLeft.expired} /><p className="mt-3 text-sm text-light-text/80">Slots go in the order payment is received.</p><CalendarReminderButton dark /></motion.div>
-          <motion.div {...item(0.75)} className="mt-6 flex flex-wrap gap-x-3 gap-y-2 text-sm text-light-text">
+          <motion.div {...item(0.75)} className="trust-row mt-6 flex flex-wrap gap-x-3 gap-y-2 text-sm text-light-text">
             <span>✓ No hidden charges</span><span className="hidden text-light-text/50 sm:inline">·</span><span>✓ Built personally by Abraham</span><span className="hidden text-light-text/50 sm:inline">·</span><span>✓ 19 years experience</span>
           </motion.div>
         </div>
@@ -273,14 +359,10 @@ function HeroSection({ slotsRemaining, timeLeft }) {
 function AbrahamLetter() {
   const reduced = useReducedMotion();
   return (
-    <section className="bg-off-white px-5 py-20" style={{ backgroundImage:  "repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(147, 51, 234, 0.06) 27px, rgba(147, 51, 234, 0.06) 28px)" }}>
+    <section className="bg-off-white px-5 py-20" style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(147, 51, 234, 0.06) 27px, rgba(147, 51, 234, 0.06) 28px)" }}>
       <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-[40fr_60fr] md:items-center">
         <motion.div initial={reduced ? false : { opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: reduced ? 0 : 0.8, ease: easeOut }} className="relative mx-auto w-full max-w-[280px] md:max-w-[420px]">
-          <img
-            src="/images/abraham-akinwumi.jpg"
-            alt="Abraham Akinwumi"
-            className="relative z-10 aspect-square w-full rounded-full border-[3px] border-purple-bright/30 object-cover shadow-[0_30px_80px_rgba(61,0,102,0.4)] md:aspect-[3/4] md:rounded-[24px]"
-          />
+          <img src="/images/abraham-akinwumi.jpg" alt="Abraham Akinwumi" className="relative z-10 aspect-square w-full rounded-full border-[3px] border-purple-bright/30 object-cover shadow-[0_30px_80px_rgba(61,0,102,0.4)] md:aspect-[3/4] md:rounded-[24px]" />
           <div className="absolute -bottom-5 -right-5 z-20 rounded-2xl bg-gradient-to-br from-orange-fire to-orange-warm px-5 py-4 text-center shadow-[0_12px_40px_rgba(234,88,12,0.4)]"><div className="text-[2.5rem] font-bold leading-none text-white">19</div><div className="text-xs font-medium uppercase tracking-[0.1em] text-white/90">Years</div></div>
           <div className="absolute -left-4 -top-4 z-0 h-[calc(100%+30px)] w-[calc(100%+30px)] rounded-[32px] border-2 border-purple-bright/20" />
         </motion.div>
@@ -317,9 +399,9 @@ function TransformationStat({ number, suffix, label }) {
 
 function OfferBox({ slotsRemaining, timeLeft }) {
   return (
-    <motion.section {...revealUp} className="bg-white px-5 py-20">
+    <motion.section {...revealUp} id="offer-box" className="bg-white px-5 py-20 scroll-mt-28">
       <div className="mx-auto grid max-w-3xl gap-8 rounded-3xl border-4 border-purple-mid bg-white p-6 shadow-[0_0_60px_rgba(147,51,234,0.28)] md:grid-cols-2 md:p-8">
-        <div><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">Your Complete Website - ₦50,000</h2><motion.ul initial="hidden" whileInView="show" viewport={{ once: true }} variants={{ show: { transition: { staggerChildren: 0.08 } } }} className="mt-6 space-y-3 text-dark-text">{offerItems.map((item) => <motion.li key={item} variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="flex gap-3"><span className="text-green-600">✓</span><span>{item}</span></motion.li>)}</motion.ul><p className="mt-6 text-sm text-dark-text/60">Every element chosen because it makes websites work, not just look good.</p></div>
+        <div><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">Your Complete Website - ₦50,000</h2><motion.ul initial="hidden" whileInView="show" viewport={{ once: true }} variants={{ show: { transition: { staggerChildren: 0.08 } } }} className="mt-6 space-y-3 text-dark-text">{offerItems.map((item) => <motion.li key={item} variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="flex gap-3"><span className="text-green-600">✓</span><span>{item}</span></motion.li>)}</motion.ul><p className="mt-6 text-sm text-dark-text/60">Every element chosen because it makes websites work, not just look good.</p><p className="mt-3 font-semibold text-orange-fire">This ₦50,000 price expires {OFFER_END_SHORT}.</p></div>
         <div className="rounded-2xl bg-off-white p-5"><div className="space-y-4"><div className="flex justify-between gap-4 text-dark-text/60"><span>Others charge:</span><span className="line-through">₦350,000 - ₦500,000</span></div><div className="flex items-end justify-between gap-4"><span>Abraham charges:</span><span className="text-4xl font-bold text-orange-fire">₦50,000</span></div><div className="flex justify-between gap-4 font-bold text-green-700"><span>You save:</span><span>₦300,000</span></div></div><div className="mt-6 rounded-xl bg-white p-4"><div className="text-xl font-bold text-purple-mid">{slotsRemaining} of 20 slots left</div><div className="mt-2 text-sm text-dark-text/70">Closes in <CountdownText timeLeft={timeLeft} /></div></div><div className="mt-5"><CtaButton expired={timeLeft.expired} /></div><a className="mt-4 inline-flex font-semibold text-purple-bright" href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer">Or chat with Abraham first →</a></div>
       </div>
     </motion.section>
@@ -339,9 +421,60 @@ function ListCard({ title, items, border }) {
   return <motion.div {...revealUp} className={`rounded-2xl border-l-4 ${border} bg-dark-text/75 p-6 text-white`}><h2 className="text-xl font-bold">{title}</h2><ul className="mt-5 space-y-3 text-light-text">{items.map((item) => <li key={item}>{item}</li>)}</ul></motion.div>;
 }
 
+function WebsiteSampleCard({ sample }) {
+  const [isActive, setIsActive] = useState(false);
+
+  const startScrolling = () => setIsActive(true);
+  const stopScrolling = () => setIsActive(false);
+
+  return (
+    <div
+      className={`relative h-80 cursor-pointer overflow-hidden rounded-2xl border-2 bg-white transition ${isActive ? "border-orange-fire shadow-[0_20px_60px_rgba(147,51,234,0.35)]" : "border-purple-bright/15 shadow-[0_8px_30px_rgba(61,0,102,0.12)]"}`}
+      onMouseEnter={startScrolling}
+      onMouseLeave={stopScrolling}
+      onTouchStart={startScrolling}
+      onTouchEnd={stopScrolling}
+      onFocus={startScrolling}
+      onBlur={stopScrolling}
+      tabIndex={0}
+      role="img"
+      aria-label={`Preview of ${sample.name} website`}
+    >
+      <div className="relative h-full w-full overflow-hidden">
+        <img
+          src={sample.image}
+          alt={`${sample.name} website preview`}
+          className="w-full object-cover object-top transition-transform"
+          style={{
+            transform: isActive ? "translateY(-30%)" : "translateY(0)",
+            transition: isActive ? "transform 10s linear" : "transform 0.5s ease",
+          }}
+        />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(61,0,102,0.95)_0%,rgba(61,0,102,0.6)_70%,transparent_100%)] px-4 pb-4 pt-10">
+        <div className="font-semibold text-white">{sample.name}</div>
+        <div className="text-sm text-orange-warm">{sample.category} - {sample.location}</div>
+        <div className="text-xs text-white/60">{sample.url}</div>
+      </div>
+      {!isActive && <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-orange-fire/40 bg-purple-deep/70 px-4 py-2 text-sm font-medium text-white backdrop-blur">Hover to preview</div>}
+    </div>
+  );
+}
+
 function CredibilitySection() {
   const years = useCountUp(19);
-  return <motion.section {...revealUp} className="bg-off-white px-5 py-20"><div className="mx-auto max-w-6xl"><div className="mx-auto max-w-2xl text-center"><div ref={years.ref} className="flex items-end justify-center gap-3"><span className="text-8xl font-bold text-orange-fire">{years.count}</span><span className="pb-4 text-4xl font-bold text-purple-mid">Years</span></div><p className="mt-4 text-[1.0625rem] leading-[1.75] text-dark-text">This is not a side hustle, not a weekend hobby, and not a template resold with a new logo. Abraham has spent a career building websites that help real businesses become visible, trusted, and easier to buy from.</p><div className="mx-auto mt-8 h-px w-full max-w-xl bg-[linear-gradient(90deg,transparent,#9333EA,transparent)]" /></div><div className="mt-10 grid gap-5 md:grid-cols-3">{[1, 2, 3].map((item) => <motion.div key={item} whileHover={{ y: -8 }} className="overflow-hidden rounded-xl bg-white shadow-lg"><div className="flex aspect-video items-center justify-center bg-gradient-to-br from-purple-mid to-orange-fire text-xl font-bold text-white">Website Sample {item}</div><div className="p-4"><div className="font-bold text-dark-text">[Business Name]</div><div className="text-sm text-dark-text/60">Category · City</div></div></motion.div>)}</div></div></motion.section>;
+  return (
+    <motion.section {...revealUp} id="website-samples" className="bg-off-white px-5 py-20 scroll-mt-28">
+      <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-2xl text-center">
+          <div ref={years.ref} className="flex items-end justify-center gap-3"><span className="text-8xl font-bold text-orange-fire">{years.count}</span><span className="pb-4 text-4xl font-bold text-purple-mid">Years</span></div>
+          <p className="mt-4 text-[1.0625rem] leading-[1.75] text-dark-text">This is not a side hustle, not a weekend hobby, and not a template resold with a new logo. Abraham has spent a career building websites that help real businesses become visible, trusted, and easier to buy from.</p>
+          <div className="mx-auto mt-8 h-px w-full max-w-xl bg-[linear-gradient(90deg,transparent,#9333EA,transparent)]" />
+        </div>
+        <div className="mt-10 grid gap-5 md:grid-cols-3">{WEBSITE_SAMPLES.map((sample) => <WebsiteSampleCard key={sample.name} sample={sample} />)}</div>
+      </div>
+    </motion.section>
+  );
 }
 
 function TestimonialsSection() {
@@ -364,11 +497,11 @@ function StatsBarItem({ number, suffix, prefix = "", label }) {
 
 function FAQSection() {
   const [open, setOpen] = useState(0);
-  return <motion.section {...revealUp} className="bg-purple-deep px-5 py-20"><div className="mx-auto max-w-3xl"><h2 className="text-center text-[clamp(1.8rem,4vw,3rem)] font-bold text-white">Questions Before You Reserve?</h2><div className="mt-8 space-y-3">{faqs.map(([question, answer], index) => <div key={question} className={`rounded-xl bg-dark-text/70 ${open === index ? "border-l-4 border-purple-bright" : ""}`}><button onClick={() => setOpen(open === index ? -1 : index)} className="flex min-h-12 w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-white"><span>{question}</span><motion.span animate={{ rotate: open === index ? 45 : 0 }} className="text-2xl text-orange-fire">+</motion.span></button><AnimatePresence initial={false}>{open === index && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"><p className="px-5 pb-5 leading-relaxed text-light-text">{answer}</p></motion.div>}</AnimatePresence></div>)}</div></div></motion.section>;
+  return <motion.section {...revealUp} id="faq-section" className="bg-purple-deep px-5 py-20 scroll-mt-28"><div className="mx-auto max-w-3xl"><h2 className="text-center text-[clamp(1.8rem,4vw,3rem)] font-bold text-white">Questions Before You Reserve?</h2><div className="mt-8 space-y-3">{faqs.map(([question, answer], index) => <div key={question} className={`rounded-xl bg-dark-text/70 ${open === index ? "border-l-4 border-purple-bright" : ""}`}><button onClick={() => setOpen(open === index ? -1 : index)} className="flex min-h-12 w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-white"><span>{question}</span><motion.span animate={{ rotate: open === index ? 45 : 0 }} className="text-2xl text-orange-fire">+</motion.span></button><AnimatePresence initial={false}>{open === index && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"><p className="px-5 pb-5 leading-relaxed text-light-text">{answer}</p></motion.div>}</AnimatePresence></div>)}</div></div></motion.section>;
 }
 
 function FinalCTA({ slotsRemaining, timeLeft }) {
-  return <motion.section {...revealUp} className="bg-[linear-gradient(135deg,#3D0066,#EA580C,#6B21A8)] bg-[length:200%_200%] px-5 py-20 text-center animate-shimmer"><div className="mx-auto max-w-3xl"><h2 className="text-[clamp(2.5rem,6vw,5rem)] font-bold leading-tight text-white">Your Business Has Been<br />Waiting Long Enough.</h2><p className="mt-5 text-lg leading-relaxed text-light-text">The businesses that grow are not always the best ones. They are the ones that said yes when the window was open.</p><div className="mt-7 text-3xl font-bold text-orange-warm">🔴 {slotsRemaining} of 20 slots remaining</div><div className="mt-3 text-2xl font-bold"><CountdownText timeLeft={timeLeft} /></div><div className="mt-8"><CtaButton expired={timeLeft.expired} variant="white">→ Reserve My Slot. ₦50,000. 48 Hours.</CtaButton><p className="mt-4 text-sm text-light-text">Fill the form below. Your slot is held for 30 minutes after submission. Payment locks it permanently.</p><CalendarReminderButton dark /></div></div></motion.section>;
+  return <motion.section {...revealUp} className="bg-[linear-gradient(135deg,#3D0066,#EA580C,#6B21A8)] bg-[length:200%_200%] px-5 py-20 text-center animate-shimmer"><div className="mx-auto max-w-3xl"><h2 className="text-[clamp(2.5rem,6vw,5rem)] font-bold leading-tight text-white">Your Business Has Been<br />Waiting Long Enough.</h2><p className="mt-5 text-lg leading-relaxed text-light-text">The businesses that grow are not always the best ones. They are the ones that said yes when the window was open. The window closes {OFFER_END_SHORT}.</p><div className="mt-7 text-3xl font-bold text-orange-warm">🔴 {slotsRemaining} of 20 slots remaining</div><div className="mt-3 text-2xl font-bold"><CountdownText timeLeft={timeLeft} /></div><div className="mt-8"><CtaButton expired={timeLeft.expired} variant="white">→ Reserve My Slot. ₦50,000.</CtaButton><p className="mt-4 text-sm text-light-text">Fill the form below. Your slot is held for 30 minutes after submission. Payment locks it permanently.</p><CalendarReminderButton dark /></div></div></motion.section>;
 }
 
 function FormField({ label, name, type = "text", placeholder, required, rows, value, onChange }) {
@@ -377,14 +510,21 @@ function FormField({ label, name, type = "text", placeholder, required, rows, va
   return <div className="flex flex-col gap-1.5"><label className="text-sm font-semibold text-dark-text">{label} {required && <span className="text-orange-fire">*</span>}</label>{type === "textarea" ? <textarea name={name} placeholder={placeholder} rows={rows} value={value} onChange={onChange} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} required={required} className={inputClass} /> : <input type={type} name={name} placeholder={placeholder} value={value} onChange={onChange} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} required={required} className={inputClass} />}</div>;
 }
 
-function ReservationForm({ expired }) {
-  const [tab, setTab] = useState("card");
+function safeSessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Private browsing can block sessionStorage; navigation still works.
+  }
+}
+
+function ReservationForm({ expired, onSlotReserved }) {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formSubmitted, setFormSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
-  const [payStatus, setPayStatus] = useState("");
   const [formState, setFormState] = useState({ firstName: "", lastName: "", businessName: "", businessDescription: "", city: "", whatsapp: "", email: "", hasWebsite: "" });
   const handleChange = (event) => setFormState((current) => ({ ...current, [event.target.name]: event.target.value }));
+
   const handleFormSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -403,47 +543,23 @@ function ReservationForm({ expired }) {
     try {
       if (FLUENT_FORMS_URL.includes("[YOUR-WORDPRESS-SITE]")) await new Promise((resolve) => setTimeout(resolve, 600));
       else await fetch(FLUENT_FORMS_URL, { method: "POST", body: formData });
-      setFormSubmitted(true);
-      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Abraham! I just submitted the form to reserve my website slot. My name is ${formState.firstName} ${formState.lastName} and my business is ${formState.businessName}.`, "_blank");
+      onSlotReserved?.();
+      const applicant = { firstName: formState.firstName, lastName: formState.lastName, businessName: formState.businessName, whatsapp: formState.whatsapp, email: formState.email, submittedAt: new Date().toISOString() };
+      safeSessionSet("abraham_applicant", JSON.stringify(applicant));
+      navigate("/payment", { state: { applicant } });
     } catch {
       setFormError("Something went wrong. Please try again or contact Abraham directly on WhatsApp.");
     } finally {
       setIsSubmitting(false);
     }
   };
-  const handlePaystackPayment = async () => {
-    setPayStatus("Opening secure Paystack checkout...");
-    try {
-      const module = await import("@paystack/inline-js");
-      const PaystackPop = module.default || module.PaystackPop;
-      const paystack = new PaystackPop();
-      paystack.newTransaction({ key: "[YOUR_PAYSTACK_PUBLIC_KEY]", email: formState.email || "customer@example.com", amount: 5000000, currency: "NGN", ref: `ABRAHAM_${Date.now()}`, metadata: { name: `${formState.firstName} ${formState.lastName}`, business: formState.businessName, phone: formState.whatsapp }, onSuccess: (transaction) => { setPayStatus("Payment received. Opening WhatsApp confirmation..."); window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=I just paid for my website slot! Transaction ref: ${transaction.reference}`, "_blank"); }, onCancel: () => setPayStatus("Checkout closed. You can retry when you're ready.") });
-    } catch {
-      setPayStatus("Paystack could not load. Please use Transfer or Opay, or check the public key.");
-    }
-  };
-  if (expired) return <section id="reservation-form" className="bg-off-white px-5 py-20"><ExpiredOffer /></section>;
-  return <motion.section {...revealUp} id="reservation-form" className="bg-off-white px-5 py-20"><div className="mx-auto max-w-3xl"><h2 className="text-center text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">Reserve Your Slot Now</h2><p className="mt-3 text-center text-sm font-semibold text-orange-fire">⏱ Your slot is not confirmed until this form is submitted. Slots go in the order payment is received.</p><div className="mt-8 rounded-[20px] border border-purple-bright/20 bg-white p-5 shadow-[0_20px_60px_rgba(61,0,102,0.1)] md:p-7">{formSubmitted ? <PostSubmissionState /> : <form onSubmit={handleFormSubmit} className="flex flex-col gap-5"><div className="grid gap-4 md:grid-cols-2"><FormField label="First Name" name="firstName" required placeholder="Your first name" value={formState.firstName} onChange={handleChange} /><FormField label="Last Name" name="lastName" required placeholder="Your last name" value={formState.lastName} onChange={handleChange} /></div><FormField label="Business Name" name="businessName" required placeholder="What is your business called?" value={formState.businessName} onChange={handleChange} /><FormField label="What does your business do?" name="businessDescription" type="textarea" required placeholder="Briefly describe what you sell or offer..." rows={3} value={formState.businessDescription} onChange={handleChange} /><FormField label="City / State" name="city" required placeholder="e.g. Lagos, Abuja, Port Harcourt..." value={formState.city} onChange={handleChange} /><FormField label="WhatsApp Number" name="whatsapp" type="tel" required placeholder="e.g. 08012345678" value={formState.whatsapp} onChange={handleChange} /><FormField label="Email Address" name="email" type="email" required placeholder="your@email.com" value={formState.email} onChange={handleChange} /><div><label className="mb-2 block text-sm font-semibold text-dark-text">Do you currently have a website? *</label><div className="grid gap-2">{[["no", "No - I've never had one"], ["yes_replace", "Yes - but it needs replacing"], ["yes_curious", "Yes - I just want to learn more"]].map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-3 text-dark-text"><input required type="radio" name="hasWebsite" value={value} checked={formState.hasWebsite === value} onChange={handleChange} className="h-[18px] w-[18px] accent-orange-fire" />{label}</label>)}</div></div><motion.button type="submit" disabled={isSubmitting} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-10 py-[18px] text-base font-semibold uppercase tracking-[0.04em] text-white shadow-[0_8px_30px_rgba(234,88,12,0.35)] disabled:cursor-not-allowed disabled:bg-none disabled:bg-gray-300">{isSubmitting ? "⏳ Submitting..." : "→ Submit & Reserve My Slot"}</motion.button>{formError && <p className="text-center text-sm text-red-600">{formError}</p>}</form>}</div><PaymentSection tab={tab} setTab={setTab} handlePaystackPayment={handlePaystackPayment} payStatus={payStatus} /></div></motion.section>;
-}
 
-function PostSubmissionState() {
-  return <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="rounded-[20px] border border-orange-fire/30 bg-gradient-to-br from-purple-deep to-purple-mid p-8 text-center md:p-12"><div className="mb-4 text-5xl">✅</div><h3 className="mb-3 text-2xl font-bold text-white">Your Slot is Being Held - 30 Minutes</h3><p className="mb-6 leading-[1.7] text-light-text">Abraham will send you a WhatsApp message shortly with your payment details. Once payment is confirmed, your slot is locked and Abraham will reach out to begin your website.</p><a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Abraham! I just submitted the form for my website slot.`} target="_blank" rel="noreferrer" className="inline-flex rounded-full bg-[#25D366] px-8 py-3 font-semibold text-white">→ Confirm on WhatsApp</a></motion.div>;
-}
-
-function PaymentSection({ tab, setTab, handlePaystackPayment, payStatus }) {
-  return <div className="mt-10 rounded-2xl bg-white p-5 shadow-lg"><h3 className="text-xl font-semibold text-purple-mid">Choose How to Pay Your ₦50,000</h3><div className="mt-5 flex gap-2 overflow-x-auto rounded-full bg-off-white p-1">{[["card", "Card"], ["transfer", "Bank Transfer"], ["opay", "Opay"]].map(([id, label]) => <button key={id} data-testid={`payment-tab-${id}`} onClick={() => setTab(id)} className={`min-w-max flex-1 rounded-full px-4 py-3 text-sm font-bold transition ${tab === id ? "bg-purple-mid text-white" : "text-purple-mid"}`}>{label}</button>)}</div>{tab === "card" && <div className="mt-6"><button onClick={handlePaystackPayment} className="w-full rounded-full bg-gradient-to-r from-orange-fire to-orange-warm py-4 text-lg font-semibold text-white transition hover:brightness-110">→ Pay ₦50,000 with Card (Paystack)</button>{payStatus && <p className="mt-3 text-center text-sm text-dark-text/70">{payStatus}</p>}</div>}{tab === "transfer" && <TransferPayment />}{tab === "opay" && <OpayPayment />}</div>;
-}
-
-function TransferPayment() {
-  return <div className="mt-6 rounded-2xl bg-off-white p-5 text-dark-text"><div className="text-sm uppercase tracking-widest text-purple-bright">Bank transfer details</div><div className="mt-3 rounded-xl bg-white p-4 text-xl font-bold text-purple-mid">[BANK NAME] | [ACCOUNT NUMBER] | Abraham Akinwumi</div><p className="mt-4">After transfer, send your payment proof to Abraham on WhatsApp to confirm your slot immediately.</p><a href={`https://wa.me/${WHATSAPP_NUMBER}?text=I have made a bank transfer for my website slot. Here is my proof:`} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-6 py-3 font-semibold text-white">→ Send Proof on WhatsApp</a></div>;
-}
-
-function OpayPayment() {
-  return <div className="mt-6 rounded-2xl bg-off-white p-5 text-dark-text"><div id="opay-qr-placeholder" data-testid="opay-qr-placeholder" className="mx-auto flex aspect-square max-w-64 items-center justify-center rounded-2xl border-2 border-dashed border-purple-300 bg-white p-6 text-center text-purple-400">[PLACEHOLDER: Opay QR Code Image - replace with actual QR]</div><p className="mt-4">After Opay payment, send your payment proof to Abraham on WhatsApp to confirm your slot immediately.</p><a href={`https://wa.me/${WHATSAPP_NUMBER}?text=I have made an Opay payment for my website slot. Here is my proof:`} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-6 py-3 font-semibold text-white">→ Send Proof on WhatsApp</a></div>;
+  if (expired) return <section id="reservation-form" className="bg-off-white px-5 py-20 scroll-mt-28"><ExpiredOffer /></section>;
+  return <motion.section {...revealUp} id="reservation-form" className="bg-off-white px-5 py-20 scroll-mt-28"><div className="mx-auto max-w-3xl"><h2 className="text-center text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">Reserve Your Slot Now</h2><p className="mt-3 text-center text-sm font-semibold text-orange-fire">⏱ Your slot is held for 30 minutes after this form is submitted. Payment happens on the next page.</p><div className="mt-8 rounded-[20px] border border-purple-bright/20 bg-white p-5 shadow-[0_20px_60px_rgba(61,0,102,0.1)] md:p-7"><form onSubmit={handleFormSubmit} className="flex flex-col gap-5"><div className="grid gap-4 md:grid-cols-2"><FormField label="First Name" name="firstName" required placeholder="Your first name" value={formState.firstName} onChange={handleChange} /><FormField label="Last Name" name="lastName" required placeholder="Your last name" value={formState.lastName} onChange={handleChange} /></div><FormField label="Business Name" name="businessName" required placeholder="What is your business called?" value={formState.businessName} onChange={handleChange} /><FormField label="What does your business do?" name="businessDescription" type="textarea" required placeholder="Briefly describe what you sell or offer..." rows={3} value={formState.businessDescription} onChange={handleChange} /><FormField label="City / State" name="city" required placeholder="e.g. Lagos, Abuja, Port Harcourt..." value={formState.city} onChange={handleChange} /><FormField label="WhatsApp Number" name="whatsapp" type="tel" required placeholder="e.g. 08012345678" value={formState.whatsapp} onChange={handleChange} /><FormField label="Email Address" name="email" type="email" required placeholder="your@email.com" value={formState.email} onChange={handleChange} /><div><label className="mb-2 block text-sm font-semibold text-dark-text">Do you currently have a website? *</label><div className="grid gap-2">{[["no", "No - I've never had one"], ["yes_replace", "Yes - but it needs replacing"], ["yes_curious", "Yes - I just want to learn more"]].map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-3 text-dark-text"><input required type="radio" name="hasWebsite" value={value} checked={formState.hasWebsite === value} onChange={handleChange} className="h-[18px] w-[18px] accent-orange-fire" />{label}</label>)}</div></div><motion.button type="submit" disabled={isSubmitting} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-10 py-[18px] text-base font-semibold uppercase tracking-[0.04em] text-white shadow-[0_8px_30px_rgba(234,88,12,0.35)] disabled:cursor-not-allowed disabled:bg-none disabled:bg-gray-300">{isSubmitting ? "⏳ Submitting..." : "→ Submit & Reserve My Slot"}</motion.button>{formError && <p className="text-center text-sm text-red-600">{formError}</p>}</form></div></div></motion.section>;
 }
 
 function ExpiredOffer() {
-  return <div className="mx-auto max-w-2xl py-12 text-center"><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">This Offer Has Closed.</h2><p className="mt-4 text-[1.0625rem] leading-[1.75] text-dark-text">All 20 slots have been filled or the 48-hour window has ended. Abraham is now building websites at his standard rate of ₦350,000.</p><a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Abraham, I want to ask about a standard website.`} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-7 py-4 text-base font-semibold uppercase tracking-[0.04em] text-white">→ Chat Abraham About a Standard Website</a></div>;
+  return <div className="mx-auto max-w-2xl py-12 text-center"><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-purple-mid">This Offer Has Closed.</h2><p className="mt-4 text-[1.0625rem] leading-[1.75] text-dark-text">All 20 slots have been filled or the offer window has ended. Abraham is now building websites at his standard rate of ₦350,000.</p><a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Abraham, I want to ask about a standard website.`} target="_blank" rel="noreferrer" className="mt-6 inline-flex rounded-full bg-gradient-to-r from-orange-fire to-orange-warm px-7 py-4 text-base font-semibold uppercase tracking-[0.04em] text-white">→ Chat Abraham About a Standard Website</a></div>;
 }
 
 function PostFormReassurance() {
@@ -463,16 +579,46 @@ function WhatsAppWidget() {
 }
 
 function Footer() {
-  return <footer className="bg-dark-text px-5 py-10 text-center text-sm text-light-text/75"><div>© Abraham Akinwumi | Website Developer | 19 Years Experience</div><div className="mt-2">Built websites that have grown businesses across Nigeria.</div><div className="mt-2">WhatsApp: +2348182126524 · Email: [PLACEHOLDER EMAIL]</div><div className="mx-auto mt-4 max-w-2xl text-xs text-light-text/45">This is a personal, one-time, 48-hour offer. 20 slots total. First paid, first served. After the timer ends, price returns to ₦350,000.</div></footer>;
+  return (
+    <footer className="bg-dark-text px-5 py-10 text-center text-sm text-light-text/75">
+      <div className="mx-auto max-w-3xl border-t border-purple-bright/15 px-6 py-6">
+        <p className="mb-2 text-sm text-light-text/60">Not looking for the ₦50,000 offer?</p>
+        <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Abraham! I'm interested in a custom website or app - not the ₦50k offer. Can we talk?`} target="_blank" rel="noreferrer" className="inline-flex border-b border-orange-warm/40 pb-0.5 font-semibold text-orange-warm">
+          Click here if you want a custom website or app instead →
+        </a>
+      </div>
+      <div>© Abraham Akinwumi | Website Developer | 19 Years Experience</div>
+      <div className="mt-2">Built websites that have grown businesses across Nigeria.</div>
+      <div className="mt-2">WhatsApp: +2348182126524 · Email: abraham@abraham.com.ng</div>
+      <div className="mx-auto mt-4 max-w-2xl text-xs text-light-text/45">Offer valid until {OFFER_END_COPY} only. This is a personal offer. 20 slots total. First paid, first served. After the timer ends, price returns to ₦350,000.</div>
+    </footer>
+  );
 }
 
-export default function AppV2() {
-  const [slotsRemaining, setSlotsRemaining] = useState(INITIAL_SLOTS);
+export default function LandingPage() {
+  const [slotsRemaining, setSlotsRemaining] = useState(() => getSlotsRemaining());
   const timeLeft = useCountdown(OFFER_END_DATE);
-  useEffect(() => {
-    const timer = setTimeout(() => setSlotsRemaining((prev) => Math.max(prev - 1, 0)), 8000);
-    return () => clearTimeout(timer);
-  }, []);
   const shared = useMemo(() => ({ slotsRemaining, timeLeft }), [slotsRemaining, timeLeft]);
-  return <main className="min-h-screen bg-off-white font-sans text-dark-text"><UrgencyBar {...shared} /><HeroSection {...shared} /><AbrahamLetter /><TransformationSection /><OfferBox {...shared} /><FOMOSection /><WhoIsThisFor /><CredibilitySection /><TestimonialsSection /><FAQSection /><FinalCTA {...shared} /><ReservationForm expired={timeLeft.expired} /><PostFormReassurance /><Footer /><WhatsAppWidget /></main>;
+  const handleSlotReserved = () => setSlotsRemaining(decrementSlot());
+
+  return (
+    <main className="min-h-screen bg-off-white font-sans text-dark-text">
+      <UrgencyBar {...shared} />
+      <NavBar />
+      <HeroSection {...shared} />
+      <AbrahamLetter />
+      <TransformationSection />
+      <OfferBox {...shared} />
+      <FOMOSection />
+      <WhoIsThisFor />
+      <CredibilitySection />
+      <TestimonialsSection />
+      <FAQSection />
+      <FinalCTA {...shared} />
+      <ReservationForm expired={timeLeft.expired} onSlotReserved={handleSlotReserved} />
+      <PostFormReassurance />
+      <Footer />
+      <WhatsAppWidget />
+    </main>
+  );
 }

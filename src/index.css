@@ -21,3 +21,44 @@ body {
 .swiper-pagination-bullet-active {
   background: #ea580c;
 }
+
+@media (max-width: 768px) {
+  .desktop-nav {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle {
+    display: block !important;
+  }
+
+  .hero-left-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-left-column .pre-badge {
+    align-self: center;
+  }
+
+  .hero-left-column h1,
+  .hero-left-column .hero-subtext-box {
+    text-align: center;
+  }
+
+  .hero-left-column .hero-subtext-box {
+    max-width: 100%;
+  }
+
+  .hero-left-column .trust-row {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hero-left-column .cta-button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
