@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -7,10 +7,11 @@ import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { FLUENT_FORM_ID, FLUENT_FORM_NONCE, FLUENT_FORMS_URL, INITIAL_SLOTS, OFFER_END_DATE, PAGE_URL, WHATSAPP_NUMBER } from "./constants";
+import { FLUENT_FORMS_URL, INITIAL_SLOTS, OFFER_END_DATE, WHATSAPP_NUMBER } from "./constants";
 import { OFFER_END_COPY, OFFER_END_SHORT } from "./utils/formatDate";
 import { getSmartTimeLabel } from "./utils/getTimeLabel";
 import { decrementSlot, getSlotsRemaining } from "./utils/slots";
+import ReminderButton from "./components/ReminderButton";
 
 const easeOut = [0.22, 1, 0.36, 1];
 
@@ -73,17 +74,18 @@ const WEBSITE_SAMPLES = [
 ];
 
 function useCountdown(targetDate) {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, expired: false });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false });
 
   useEffect(() => {
     const tick = () => {
       const diff = targetDate - new Date();
       if (diff <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, expired: true });
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: true });
         return;
       }
       setTimeLeft({
-        hours: Math.floor(diff / 3600000),
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
         minutes: Math.floor((diff % 3600000) / 60000),
         seconds: Math.floor((diff % 60000) / 1000),
         expired: false,
@@ -143,39 +145,7 @@ function scrollToForm() {
 }
 
 function CountdownText({ timeLeft }) {
-  return <span className="tabular-nums text-orange-warm">{pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}</span>;
-}
-
-function CalendarReminderButton({ dark = false }) {
-  const downloadCalendarReminder = () => {
-    const reminderTime = new Date(OFFER_END_DATE.getTime() - 6 * 60 * 60 * 1000);
-    const format = (date) => date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-    const icsContent = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "BEGIN:VEVENT",
-      `DTSTART:${format(reminderTime)}`,
-      `DTEND:${format(OFFER_END_DATE)}`,
-      "SUMMARY:Abraham's ₦50k Website Offer - Closing Soon!",
-      `DESCRIPTION:Abraham Akinwumi's ₦50,000 website offer closes soon. Visit ${PAGE_URL} or chat Abraham: https://wa.me/${WHATSAPP_NUMBER}`,
-      `URL:${PAGE_URL}`,
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\n");
-    const blob = new Blob([icsContent], { type: "text/calendar" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "abraham-website-offer-reminder.ics";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <button onClick={downloadCalendarReminder} className={`mt-4 rounded-full border px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5 hover:brightness-110 ${dark ? "border-white/70 text-white" : "border-purple-bright text-purple-bright"}`}>
-      ⏰ Remind Me Before the Offer Ends
-    </button>
-  );
+  return <span className="tabular-nums text-orange-warm">{pad(timeLeft.days)}:{pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}</span>;
 }
 
 function CtaButton({ expired, children = "→ Reserve My Slot Now", variant = "orange" }) {
@@ -275,7 +245,7 @@ function NavBar() {
 }
 
 function CountdownBoxes({ timeLeft }) {
-  const boxes = [["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
+  const boxes = [["DAYS", pad(timeLeft.days)], ["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
   return (
     <div className="flex items-center justify-center gap-2">
       {boxes.map(([label, value], index) => (
@@ -345,7 +315,7 @@ function HeroSection({ slotsRemaining, timeLeft }) {
             <div><div className="text-xl font-medium text-light-text/45 line-through">₦350,000</div><div className="mt-1 text-xs uppercase tracking-[0.12em] text-light-text/80">Normal Market Price</div></div>
             <div><div className="text-[clamp(2rem,5vw,3rem)] font-bold leading-none text-orange-fire drop-shadow-[0_0_20px_rgba(234,88,12,0.5)]">₦50,000</div><div className="mt-1 text-xs uppercase tracking-[0.12em] text-orange-warm">Your Price Today</div></div>
           </motion.div>
-          <motion.div {...item(0.6)} className="mt-8"><CtaButton expired={timeLeft.expired} /><p className="mt-3 text-sm text-light-text/80">Slots go in the order payment is received.</p><CalendarReminderButton dark /></motion.div>
+          <motion.div {...item(0.6)} className="mt-8"><CtaButton expired={timeLeft.expired} /><p className="mt-3 text-sm text-light-text/80">Slots go in the order payment is received.</p><ReminderButton dark /></motion.div>
           <motion.div {...item(0.75)} className="trust-row mt-6 flex flex-wrap gap-x-3 gap-y-2 text-sm text-light-text">
             <span>✓ No hidden charges</span><span className="hidden text-light-text/50 sm:inline">·</span><span>✓ Built personally by Abraham</span><span className="hidden text-light-text/50 sm:inline">·</span><span>✓ 19 years experience</span>
           </motion.div>
@@ -501,7 +471,7 @@ function FAQSection() {
 }
 
 function FinalCTA({ slotsRemaining, timeLeft }) {
-  return <motion.section {...revealUp} className="bg-[linear-gradient(135deg,#3D0066,#EA580C,#6B21A8)] bg-[length:200%_200%] px-5 py-20 text-center animate-shimmer"><div className="mx-auto max-w-3xl"><h2 className="text-[clamp(2.5rem,6vw,5rem)] font-bold leading-tight text-white">Your Business Has Been<br />Waiting Long Enough.</h2><p className="mt-5 text-lg leading-relaxed text-light-text">The businesses that grow are not always the best ones. They are the ones that said yes when the window was open. The window closes {OFFER_END_SHORT}.</p><div className="mt-7 text-3xl font-bold text-orange-warm">🔴 {slotsRemaining} of 20 slots remaining</div><div className="mt-3 text-2xl font-bold"><CountdownText timeLeft={timeLeft} /></div><div className="mt-8"><CtaButton expired={timeLeft.expired} variant="white">→ Reserve My Slot. ₦50,000.</CtaButton><p className="mt-4 text-sm text-light-text">Fill the form below. Your slot is held for 30 minutes after submission. Payment locks it permanently.</p><CalendarReminderButton dark /></div></div></motion.section>;
+  return <motion.section {...revealUp} className="bg-[linear-gradient(135deg,#3D0066,#EA580C,#6B21A8)] bg-[length:200%_200%] px-5 py-20 text-center animate-shimmer"><div className="mx-auto max-w-3xl"><h2 className="text-[clamp(2.5rem,6vw,5rem)] font-bold leading-tight text-white">Your Business Has Been<br />Waiting Long Enough.</h2><p className="mt-5 text-lg leading-relaxed text-light-text">The businesses that grow are not always the best ones. They are the ones that said yes when the window was open. The window closes {OFFER_END_SHORT}.</p><div className="mt-7 text-3xl font-bold text-orange-warm">🔴 {slotsRemaining} of 20 slots remaining</div><div className="mt-3 text-2xl font-bold"><CountdownText timeLeft={timeLeft} /></div><div className="mt-8"><CtaButton expired={timeLeft.expired} variant="white">→ Reserve My Slot. ₦50,000.</CtaButton><p className="mt-4 text-sm text-light-text">Fill the form below. Your slot is held for 30 minutes after submission. Payment locks it permanently.</p><ReminderButton dark /></div></div></motion.section>;
 }
 
 function FormField({ label, name, type = "text", placeholder, required, rows, value, onChange }) {
@@ -529,27 +499,57 @@ function ReservationForm({ expired, onSlotReserved }) {
     event.preventDefault();
     setIsSubmitting(true);
     setFormError("");
-    const formData = new FormData();
-    formData.append("form_id", FLUENT_FORM_ID);
-    formData.append(`_fluentform_${FLUENT_FORM_ID}_fluentformnonce`, FLUENT_FORM_NONCE);
-    formData.append("names[first_name]", formState.firstName);
-    formData.append("names[last_name]", formState.lastName);
-    formData.append("email", formState.email);
-    formData.append("phone", formState.whatsapp);
-    formData.append("business_name", formState.businessName);
-    formData.append("business_description", formState.businessDescription);
-    formData.append("city", formState.city);
-    formData.append("has_website", formState.hasWebsite);
+
+    const required = ["firstName", "lastName", "email", "whatsapp", "businessName"];
+    for (const field of required) {
+      if (!formState[field]?.trim()) {
+        setFormError("Please fill in all required fields.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formState.email)) {
+      setFormError("Please enter a valid email address.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      if (FLUENT_FORMS_URL.includes("[YOUR-WORDPRESS-SITE]")) await new Promise((resolve) => setTimeout(resolve, 600));
-      else await fetch(FLUENT_FORMS_URL, { method: "POST", body: formData });
+      const response = await fetch(FLUENT_FORMS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({
+          first_name: formState.firstName.trim(),
+          last_name: formState.lastName.trim(),
+          email: formState.email.trim().toLowerCase(),
+          whatsapp: formState.whatsapp.trim(),
+          business_name: formState.businessName.trim(),
+          business_description: formState.businessDescription?.trim() || "",
+          city: formState.city?.trim() || "",
+          has_website: formState.hasWebsite || "",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || "Submission failed. Please try again.");
+
       onSlotReserved?.();
       const applicant = { firstName: formState.firstName, lastName: formState.lastName, businessName: formState.businessName, whatsapp: formState.whatsapp, email: formState.email, submittedAt: new Date().toISOString() };
       safeSessionSet("abraham_applicant", JSON.stringify(applicant));
       navigate("/payment", { state: { applicant } });
-    } catch {
-      setFormError("Something went wrong. Please try again or contact Abraham directly on WhatsApp.");
-    } finally {
+    } catch (error) {
+      console.error("Form submission error:", error);
+      setFormError(error.message || "Something went wrong. Please try again or contact Abraham directly on WhatsApp.");
       setIsSubmitting(false);
     }
   };

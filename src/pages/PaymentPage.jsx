@@ -23,7 +23,7 @@ export default function PaymentPage() {
   const applicant = useMemo(() => location.state?.applicant || readApplicant(), [location.state]);
   const submittedAt = useMemo(() => new Date(applicant.submittedAt || new Date()), [applicant.submittedAt]);
   const expiresAt = useMemo(() => new Date(submittedAt.getTime() + PAYMENT_WINDOW_MINUTES * 60 * 1000), [submittedAt]);
-  const [timeLeft, setTimeLeft] = useState({ minutes: PAYMENT_WINDOW_MINUTES, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: PAYMENT_WINDOW_MINUTES, seconds: 0 });
   const [expired, setExpired] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
   const [payStatus, setPayStatus] = useState("");
@@ -33,11 +33,13 @@ export default function PaymentPage() {
       const diff = expiresAt - new Date();
       if (diff <= 0) {
         setExpired(true);
-        setTimeLeft({ minutes: 0, seconds: 0 });
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
         return;
       }
       setTimeLeft({
-        minutes: Math.floor(diff / 60000),
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000) / 60000),
         seconds: Math.floor((diff % 60000) / 1000),
       });
     };
@@ -96,6 +98,10 @@ export default function PaymentPage() {
             <>
               <p className="mb-1 text-xs uppercase tracking-[0.08em] text-white/80">Your slot is secured for</p>
               <div className="flex items-center justify-center gap-2">
+                <TimeBox value={pad(timeLeft.days)} label="DAY" />
+                <span className="text-3xl font-bold text-orange-fire">:</span>
+                <TimeBox value={pad(timeLeft.hours)} label="HRS" />
+                <span className="text-3xl font-bold text-orange-fire">:</span>
                 <TimeBox value={pad(timeLeft.minutes)} label="MIN" />
                 <span className="text-3xl font-bold text-orange-fire">:</span>
                 <TimeBox value={pad(timeLeft.seconds)} label="SEC" />
