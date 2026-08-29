@@ -1,11 +1,10 @@
-import { AnimatePresence, motion } from "framer-motion";
+﻿import { AnimatePresence, motion } from "framer-motion";
 import React, { useState } from "react";
 import { OFFER_END_DATE, PAGE_URL, WHATSAPP_NUMBER } from "../constants";
 
-const REMINDER_HOURS_BEFORE = 6;
-const REMINDER_FIRE_AT = new Date(OFFER_END_DATE.getTime() - REMINDER_HOURS_BEFORE * 60 * 60 * 1000);
+const DAILY_REMINDER_HOURS = [9, 18];
 const REMINDER_TITLE = "Abraham's ₦50k Website Offer - Closing Soon!";
-const REMINDER_BODY = `Only ${REMINDER_HOURS_BEFORE} hours left. Tap to reserve your slot before the ₦50,000 offer ends.`;
+const REMINDER_BODY = "Tap to reserve your slot before the ₦50,000 offer ends.";
 
 const formatReminderTime = (date) =>
   date.toLocaleString("en-GB", {
@@ -16,12 +15,37 @@ const formatReminderTime = (date) =>
     minute: "2-digit",
   });
 
+const buildDailyReminders = () => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  const reminders = [];
+  for (const day = new Date(start); day <= OFFER_END_DATE; day.setDate(day.getDate() + 1)) {
+    DAILY_REMINDER_HOURS.forEach((hour) => {
+      const fireAtDate = new Date(day);
+      fireAtDate.setHours(hour, 0, 0, 0);
+      if (fireAtDate > now && fireAtDate <= OFFER_END_DATE) {
+        reminders.push({
+          fireAt: fireAtDate.getTime(),
+          title: REMINDER_TITLE,
+          body: REMINDER_BODY,
+          tag: `abraham-offer-reminder-${fireAtDate.toISOString()}`,
+        });
+      }
+    });
+  }
+
+  return reminders;
+};
+
 export default function ReminderButton({ dark = false, style = {} }) {
   const [status, setStatus] = useState("idle");
+  const [reminderCount, setReminderCount] = useState(0);
 
   const openWhatsAppFallback = () => {
     const message = encodeURIComponent(
-      "Hi Abraham, please send me a reminder about your ₦50,000 website offer before it closes on September 2nd, 2026. I don't want to miss it!",
+      "Hi Abraham, please send me daily reminders about your ₦50,000 website offer before it closes on September 2nd, 2026. I don't want to miss it!",
     );
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, "_blank");
   };
@@ -49,25 +73,30 @@ export default function ReminderButton({ dark = false, style = {} }) {
     }
 
     try {
+      const reminders = buildDailyReminders();
+      if (!reminders.length) {
+        setStatus("fallback");
+        return;
+      }
+
       const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
 
       const worker = registration.active || registration.waiting || registration.installing;
       worker?.postMessage({
-        type: "SCHEDULE_REMINDER",
-        fireAt: REMINDER_FIRE_AT.getTime(),
-        title: REMINDER_TITLE,
-        body: REMINDER_BODY,
+        type: "SCHEDULE_REMINDERS",
+        reminders,
         url: PAGE_URL,
       });
 
       await registration.showNotification("Reminder Set", {
-        body: `We'll remind you on ${formatReminderTime(REMINDER_FIRE_AT)}, ${REMINDER_HOURS_BEFORE} hours before the offer ends.`,
+        body: `We'll remind you twice daily. Next reminder: ${formatReminderTime(new Date(reminders[0].fireAt))}.`,
         icon: "/icon-192.png",
         tag: "reminder-confirmation",
         requireInteraction: false,
       });
 
+      setReminderCount(reminders.length);
       setStatus("scheduled");
     } catch (error) {
       console.error("Service worker registration failed:", error);
@@ -97,13 +126,13 @@ export default function ReminderButton({ dark = false, style = {} }) {
 
         {status === "requesting" && (
           <motion.div key="requesting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`mt-4 inline-flex rounded-full border px-5 py-3 text-sm font-semibold opacity-75 ${baseClass}`}>
-            Setting up your reminder...
+            Setting up your reminders...
           </motion.div>
         )}
 
         {status === "scheduled" && (
           <ReminderNotice title="Reminder Set" tone="success">
-            You'll get a notification on {formatReminderTime(REMINDER_FIRE_AT)}.
+            {reminderCount} reminders scheduled, two per day where time remains.
           </ReminderNotice>
         )}
 

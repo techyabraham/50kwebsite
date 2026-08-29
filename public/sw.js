@@ -7,17 +7,15 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "SCHEDULE_REMINDER") return;
+  if (event.data?.type !== "SCHEDULE_REMINDERS") return;
 
-  const { fireAt, title, body, url } = event.data;
-  const delay = fireAt - Date.now();
-
-  const showReminder = () => {
+  const { reminders = [], url } = event.data;
+  const showReminder = ({ title, body, tag }) => {
     self.registration.showNotification(title, {
       body,
       icon: "/icon-192.png",
       badge: "/icon-72.png",
-      tag: "abraham-offer-reminder",
+      tag,
       renotify: true,
       requireInteraction: true,
       data: { url },
@@ -28,12 +26,11 @@ self.addEventListener("message", (event) => {
     });
   };
 
-  if (delay <= 0) {
-    showReminder();
-    return;
-  }
-
-  setTimeout(showReminder, delay);
+  reminders.forEach((reminder) => {
+    const delay = reminder.fireAt - Date.now();
+    if (delay <= 0) return;
+    setTimeout(() => showReminder(reminder), delay);
+  });
 });
 
 self.addEventListener("notificationclick", (event) => {

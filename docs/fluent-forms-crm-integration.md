@@ -12,7 +12,7 @@ VITE_FLUENT_FORM_NONCE=not_needed
 VITE_FLUENT_FORMS_URL=https://elements.abraham.com.ng/wp-json/abraham/v1/submit
 ```
 
-The React code posts JSON to `VITE_FLUENT_FORMS_URL`. It no longer depends on a browser-side Fluent Forms nonce.
+The React code posts a JSON string to `VITE_FLUENT_FORMS_URL` with `Content-Type: text/plain;charset=UTF-8`. This avoids unnecessary CORS preflight requests. The WordPress bridge parses both standard JSON requests and this plain-text JSON request shape.
 
 ## 2. Install the WordPress Bridge
 
@@ -25,6 +25,8 @@ On WordPress, create this folder:
 `wp-content/plugins/abraham-form-bridge/`
 
 Upload `abraham-form-bridge.php` into that folder, then activate **Abraham Form Bridge** in WordPress Plugins.
+
+If the plugin is already installed, replace the existing file with the current project copy. The earlier bridge used Fluent Forms' `FormHandler` constructor incorrectly and can throw a WordPress critical error on submission.
 
 The endpoint is:
 
@@ -93,6 +95,7 @@ The bridge currently allows:
 
 ```txt
 https://50kwebsite.vercel.app
+https://www.50kwebsite.vercel.app
 http://localhost:5173
 http://localhost:5174
 http://localhost:5175

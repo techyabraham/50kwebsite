@@ -17,10 +17,9 @@ add_action('rest_api_init', function () {
     ]);
 });
 
-function abraham_send_cors_headers() {
+function abraham_handle_form_submission(WP_REST_Request $request) {
     $allowed_origins = [
         'https://50kwebsite.vercel.app',
-        'https://www.50kwebsite.vercel.app',
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:5175',
@@ -30,26 +29,17 @@ function abraham_send_cors_headers() {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if (in_array($origin, $allowed_origins, true)) {
         header("Access-Control-Allow-Origin: $origin");
-        header('Vary: Origin');
     }
 
     header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
-    header('Access-Control-Max-Age: 86400');
-}
-
-function abraham_handle_form_submission(WP_REST_Request $request) {
-    abraham_send_cors_headers();
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+    header('Access-Control-Allow-Credentials: true');
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         return new WP_REST_Response(null, 200);
     }
 
     $body = $request->get_json_params();
-    if (empty($body)) {
-        $body = json_decode($request->get_body(), true);
-    }
-
     if (empty($body)) {
         return new WP_REST_Response([
             'success' => false,
@@ -85,7 +75,7 @@ function abraham_handle_form_submission(WP_REST_Request $request) {
 
     $form_id = 10;
 
-    if (!class_exists('\FluentForm\App\Services\Form\SubmissionHandlerService')) {
+    if (!function_exists('wpFluent') || !class_exists('\FluentForm\App\Modules\Form\FormHandler')) {
         return new WP_REST_Response([
             'success' => false,
             'message' => 'Fluent Forms not available on this server.',
@@ -106,14 +96,16 @@ function abraham_handle_form_submission(WP_REST_Request $request) {
     ];
 
     try {
-        $response = (new \FluentForm\App\Services\Form\SubmissionHandlerService())->handleSubmission($form_data, $form_id);
+        $form     = wpFluent()->table('fluentform_forms')->find($form_id);
+        $handler  = new \FluentForm\App\Modules\Form\FormHandler($form_id);
+        $response = $handler->submission($form_data, $form);
 
         return new WP_REST_Response([
             'success' => true,
             'message' => 'Your slot has been reserved! Abraham will be in touch shortly.',
             'data'    => $response,
         ], 200);
-    } catch (\Throwable $e) {
+    } catch (\Exception $e) {
         global $wpdb;
 
         $entry_data = wp_json_encode([

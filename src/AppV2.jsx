@@ -145,7 +145,7 @@ function scrollToForm() {
 }
 
 function CountdownText({ timeLeft }) {
-  return <span className="tabular-nums text-orange-warm">{pad(timeLeft.days)}:{pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}</span>;
+  return <span className="whitespace-nowrap tabular-nums text-orange-warm">{pad(timeLeft.days)}:{pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}</span>;
 }
 
 function CtaButton({ expired, children = "→ Reserve My Slot Now", variant = "orange" }) {
@@ -175,12 +175,12 @@ function UrgencyBar({ slotsRemaining, timeLeft }) {
   const reduced = useReducedMotion();
   const smartLabel = useSmartLabel();
   return (
-    <motion.div initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.6 }} className="fixed left-0 top-0 z-[100] flex h-11 w-full items-center justify-center bg-[linear-gradient(90deg,#3D0066,#9333EA,#3D0066)] bg-[length:200%_200%] px-4 text-sm font-semibold text-white shadow-lg animate-shimmer">
+    <motion.div initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.6 }} className="fixed left-0 top-0 z-[100] flex min-h-11 w-full items-center justify-center bg-[linear-gradient(90deg,#3D0066,#9333EA,#3D0066)] bg-[length:200%_200%] px-3 py-1.5 text-xs font-semibold text-white shadow-lg animate-shimmer sm:px-4 sm:text-sm">
       <div className="hidden flex-1 items-center gap-2 md:flex">
         <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-dot-pulse" />
         <span>{slotsRemaining} of 20 slots remaining · {smartLabel}</span>
       </div>
-      <div className="flex flex-1 items-center justify-center gap-2">
+      <div className="flex flex-1 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center leading-tight">
         <span>⚡ OFFER CLOSES:</span>
         <CountdownText timeLeft={timeLeft} />
         <span className="hidden text-white/70 sm:inline">· {OFFER_END_SHORT}</span>
@@ -213,7 +213,7 @@ function NavBar() {
   };
 
   return (
-    <nav className={`fixed left-0 right-0 top-11 z-[90] border-b border-purple-bright/30 backdrop-blur-xl transition ${scrolled ? "bg-purple-deep/95" : "bg-purple-deep/85"}`}>
+    <nav className={`fixed left-0 right-0 top-[3.25rem] z-[90] border-b border-purple-bright/30 backdrop-blur-xl transition sm:top-11 ${scrolled ? "bg-purple-deep/95" : "bg-purple-deep/85"}`}>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <span className="text-base font-bold text-white tracking-[-0.01em]">Abraham<span className="text-orange-fire">.</span></span>
         <div className="desktop-nav flex items-center gap-2">
@@ -247,11 +247,11 @@ function NavBar() {
 function CountdownBoxes({ timeLeft }) {
   const boxes = [["DAYS", pad(timeLeft.days)], ["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="mx-auto grid max-w-[22rem] grid-cols-2 gap-2 sm:flex sm:max-w-none sm:items-center sm:justify-center">
       {boxes.map(([label, value], index) => (
         <React.Fragment key={label}>
-          {index > 0 && <span className="text-4xl font-bold text-orange-fire">:</span>}
-          <div className="rounded-xl border border-orange-fire/30 bg-black/40 px-4 py-3 text-center">
+          {index > 0 && <span className="hidden text-4xl font-bold text-orange-fire sm:inline">:</span>}
+          <div className="rounded-xl border border-orange-fire/30 bg-black/40 px-3 py-3 text-center sm:px-4">
             <div className="text-[clamp(2rem,5vw,3.5rem)] font-bold leading-none tabular-nums text-orange-warm">{value}</div>
             <div className="mt-2 text-[0.7rem] uppercase tracking-[0.12em] text-light-text">{label}</div>
           </div>
@@ -520,8 +520,7 @@ function ReservationForm({ expired, onSlotReserved }) {
       const response = await fetch(FLUENT_FORMS_URL, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "text/plain;charset=UTF-8",
         },
         body: JSON.stringify({
           first_name: formState.firstName.trim(),
@@ -549,7 +548,7 @@ function ReservationForm({ expired, onSlotReserved }) {
       navigate("/payment", { state: { applicant } });
     } catch (error) {
       console.error("Form submission error:", error);
-      setFormError(error.message || "Something went wrong. Please try again or contact Abraham directly on WhatsApp.");
+      setFormError(error.message || "The form could not connect. Please try again or contact Abraham directly on WhatsApp.");
       setIsSubmitting(false);
     }
   };
