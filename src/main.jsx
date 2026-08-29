@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LandingPage from "./AppV2.jsx";
+import OnboardingPage from "./pages/OnboardingPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
 import "./index.css";
 
@@ -11,6 +12,7 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>,

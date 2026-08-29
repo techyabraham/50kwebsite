@@ -6,3 +6,10 @@ export const PAGE_URL = "https://50kwebsite.vercel.app/";
 export const FLUENT_FORM_ID = import.meta.env.VITE_FLUENT_FORM_ID || "10";
 export const FLUENT_FORM_NONCE = import.meta.env.VITE_FLUENT_FORM_NONCE || "not_needed";
 export const FLUENT_FORMS_URL = import.meta.env.VITE_FLUENT_FORMS_URL || "https://elements.abraham.com.ng/wp-json/abraham/v1/submit";
+export const INTAKE_FORM_URL = import.meta.env.VITE_INTAKE_FORM_URL || "https://elements.abraham.com.ng/wp-json/abraham/v1/intake";
+export const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
+export const MANUAL_BANK_DETAILS = {
+  bank: "UBA",
+  accountNumber: "2141500650",
+  accountName: "Abraham Tobi Akomolafe",
+};

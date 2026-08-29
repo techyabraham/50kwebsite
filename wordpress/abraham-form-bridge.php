@@ -15,6 +15,12 @@ add_action('rest_api_init', function () {
         'callback'            => 'abraham_handle_form_submission',
         'permission_callback' => '__return_true',
     ]);
+
+    register_rest_route('abraham/v1', '/intake', [
+        'methods'             => ['POST', 'OPTIONS'],
+        'callback'            => 'abraham_handle_intake_submission',
+        'permission_callback' => '__return_true',
+    ]);
 });
 
 function abraham_send_cors_headers() {
@@ -154,6 +160,123 @@ function abraham_handle_form_submission(WP_REST_Request $request) {
         return new WP_REST_Response([
             'success' => true,
             'message' => 'Your slot has been reserved!',
+        ], 200);
+    }
+}
+
+function abraham_get_request_body(WP_REST_Request $request) {
+    $body = $request->get_json_params();
+    if (empty($body)) {
+        $body = json_decode($request->get_body(), true);
+    }
+
+    return is_array($body) ? $body : [];
+}
+
+function abraham_handle_intake_submission(WP_REST_Request $request) {
+    abraham_send_cors_headers();
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        return new WP_REST_Response(null, 200);
+    }
+
+    $body = abraham_get_request_body($request);
+
+    if (empty($body)) {
+        return new WP_REST_Response([
+            'success' => false,
+            'message' => 'No onboarding data received.',
+        ], 400);
+    }
+
+    $required = ['name', 'businessName', 'whatsapp', 'email', 'whatYouDo', 'audience', 'goal', 'services', 'pages', 'tone'];
+    foreach ($required as $field) {
+        if (empty($body[$field])) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => "Missing required field: $field",
+            ], 422);
+        }
+    }
+
+    $email = sanitize_email($body['email']);
+    if (!is_email($email)) {
+        return new WP_REST_Response([
+            'success' => false,
+            'message' => 'Invalid email address.',
+        ], 422);
+    }
+
+    $form_id = 11;
+
+    if (!class_exists('\FluentForm\App\Services\Form\SubmissionHandlerService')) {
+        return new WP_REST_Response([
+            'success' => false,
+            'message' => 'Fluent Forms not available on this server.',
+        ], 500);
+    }
+
+    $form_data = [
+        'name'              => sanitize_text_field($body['name']),
+        'business_name'     => sanitize_text_field($body['businessName']),
+        'whatsapp'          => sanitize_text_field($body['whatsapp']),
+        'email'             => $email,
+        'what_you_do'       => sanitize_textarea_field($body['whatYouDo']),
+        'audience'          => sanitize_textarea_field($body['audience']),
+        'goal'              => sanitize_text_field($body['goal']),
+        'services'          => sanitize_textarea_field($body['services']),
+        'pages'             => sanitize_text_field($body['pages']),
+        'tone'              => sanitize_text_field($body['tone']),
+        'colors'            => sanitize_text_field($body['colors'] ?? ''),
+        'inspiration'       => esc_url_raw($body['inspiration'] ?? ''),
+        'file_names'        => sanitize_text_field($body['files'] ?? ''),
+        'instagram'         => sanitize_text_field($body['instagram'] ?? ''),
+        'facebook'          => sanitize_text_field($body['facebook'] ?? ''),
+        'tiktok'            => sanitize_text_field($body['tiktok'] ?? ''),
+        'twitter'           => sanitize_text_field($body['twitter'] ?? ''),
+        'extras'            => sanitize_textarea_field($body['extras'] ?? ''),
+        'payment_method'    => sanitize_text_field($body['payment_method'] ?? ''),
+        'payment_reference' => sanitize_text_field($body['payment_reference'] ?? ''),
+        'paid_at'           => sanitize_text_field($body['paid_at'] ?? ''),
+        'source'            => sanitize_text_field($body['source'] ?? 'react-onboarding-page'),
+    ];
+
+    try {
+        $response = (new \FluentForm\App\Services\Form\SubmissionHandlerService())->handleSubmission($form_data, $form_id);
+
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => 'Your website brief has been submitted.',
+            'data'    => $response,
+        ], 200);
+    } catch (\Throwable $e) {
+        global $wpdb;
+
+        $wpdb->insert(
+            $wpdb->prefix . 'fluentform_submissions',
+            [
+                'form_id'      => $form_id,
+                'response'     => wp_json_encode($form_data),
+                'source_url'   => 'https://50kwebsite.vercel.app/onboarding',
+                'created_at'   => current_time('mysql'),
+                'updated_at'   => current_time('mysql'),
+                'status'       => 'unread',
+                'is_favourite' => 0,
+            ],
+            ['%d', '%s', '%s', '%s', '%s', '%s', '%d']
+        );
+
+        if ($wpdb->last_error) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'Onboarding submission failed. Please contact Abraham directly on WhatsApp.',
+                'debug'   => WP_DEBUG ? $e->getMessage() : null,
+            ], 500);
+        }
+
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => 'Your website brief has been submitted.',
         ], 200);
     }
 }
