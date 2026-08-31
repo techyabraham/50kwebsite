@@ -34,7 +34,7 @@ const faqs = [
 ];
 
 const offerItems = [
-  "Full website with unlimited pages",
+  "Full website with up to 10 pages",
   "Mobile optimised design",
   "Domain included",
   "Hosting included",
@@ -55,17 +55,19 @@ const testimonials = [
     image: "/images/winner-ezekiel.jpg",
   },
   {
-    quote: "I used to tell people I had a business. Now I send them a link. That one change, sending someone a link instead of trying to explain, changed how people see what I do.",
-    name: "[Client Name]",
-    business: "[Business Name]",
-    city: "[City]",
+    quote: "Before I built my website, my business was doing considerably well, but after my friend ecouraged me to have a website and introduced me to Abraham, I am glad that I made the website through Abraham. I realised that though I was doing well, I was leaving a lot of money on the table by not having a website. Having a website launched our business into reaching a new level of people that we wouldn't have been able to reach without a good website.  A lot of people found me by searching for my service online, there is a thing that a good website does, it makes customers see you as more valuable and this helped me close deals faster now",
+    name: "Chime Joshua",
+    business: "Genius Quest Hub",
+    city: "UK",
+    image: "/images/chime-joshua-genius-quest-hub.jpg",
   },
-  {
+  /*{
     quote: "The day my website went live, I realised I had been hiding my business. Abraham understood exactly what I needed and delivered something that made my business look like what it truly is.",
     name: "[Client Name]",
     business: "[Business Name]",
     city: "[City]",
   },
+  */
 ];
 
 const WEBSITE_SAMPLES = [
@@ -362,7 +364,7 @@ function TransformationSection() {
   return (
     <motion.section {...revealUp} className="bg-[linear-gradient(135deg,#3D0066,#1A0030)] px-5 py-20">
       <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2 md:items-center">
-        <div><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-white">What Happens When a Small Business Gets a Real Website</h2><p className="mt-5 text-[1.0625rem] leading-[1.75] text-light-text">The phone changes. People stop asking if you are serious and start asking how soon you can help them. Your business becomes easier to explain, easier to trust, and easier to recommend.</p><div className="mt-7 rounded-xl border-l-4 border-orange-fire bg-dark-text/60 p-5 text-xl italic leading-relaxed text-white">"The day my website went live, I realised I had been hiding my business. Not on purpose, but that was what it was. Hiding."<div className="mt-3 text-sm not-italic text-light-text/70">- A client Abraham built a website for</div></div></div>
+        <div><h2 className="text-[clamp(1.8rem,4vw,3rem)] font-bold text-white">What Happens When a Small Business Gets a Real Website</h2><p className="mt-5 text-[1.0625rem] leading-[1.75] text-light-text">The phone changes. People stop asking if you are serious and start asking how soon you can help them. Your business becomes easier to explain, easier to trust, and easier to recommend.</p><div className="mt-7 rounded-xl border-l-4 border-orange-fire bg-dark-text/60 p-5 text-xl italic leading-relaxed text-white">"Before I built my website, my business was doing considerably well, but after my friend ecouraged me to have a website and introduced me to Abraham, I am glad that I made the website through Abraham. I realised that though I was doing well, I was leaving a lot of money on the table by not having a website..."<div className="mt-3 text-sm not-italic text-light-text/70">- A client Abraham built a website for</div></div></div>
         <div className="grid gap-4"><TransformationStat number={81} suffix="%" label="of customers research a business online before contacting them" /><TransformationStat number={40} suffix="%" label="more revenue growth for businesses with websites vs without" /><TransformationStat number={100} suffix="M+" label="Nigerian internet users actively searching for services like yours" /></div>
       </div>
     </motion.section>
