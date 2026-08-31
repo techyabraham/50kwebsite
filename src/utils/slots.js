@@ -1,4 +1,4 @@
-import { INITIAL_SLOTS, SLOT_STORAGE_KEY } from "../constants";
+import { INITIAL_SLOTS, SLOT_STORAGE_KEY, SLOTS_URL } from "../constants";
 
 export const getSlotsRemaining = () => {
   try {
@@ -25,6 +25,33 @@ export const decrementSlot = () => {
   return next;
 };
 
+export const fetchSlotsRemaining = async () => {
+  try {
+    const response = await fetch(SLOTS_URL, { method: "GET" });
+    if (!response.ok) throw new Error(`Slot endpoint returned ${response.status}`);
+    const data = await response.json();
+    const slots = Number.parseInt(data.slots_remaining, 10);
+    if (!Number.isFinite(slots)) throw new Error("Invalid slot count");
+    localStorage.setItem(SLOT_STORAGE_KEY, String(Math.max(0, slots)));
+    return Math.max(0, slots);
+  } catch {
+    return getSlotsRemaining();
+  }
+};
+
+export const decrementRemoteSlot = async () => {
+  try {
+    const response = await fetch(`${SLOTS_URL}/decrement`, { method: "POST" });
+    if (!response.ok) throw new Error(`Slot endpoint returned ${response.status}`);
+    const data = await response.json();
+    const slots = Number.parseInt(data.slots_remaining, 10);
+    if (!Number.isFinite(slots)) throw new Error("Invalid slot count");
+    localStorage.setItem(SLOT_STORAGE_KEY, String(Math.max(0, slots)));
+    return Math.max(0, slots);
+  } catch {
+    return decrementSlot();
+  }
+};
+
 // TO RESET SLOT COUNT: open browser console and run:
 // localStorage.setItem('abraham_slots_remaining', '20'); location.reload();
-

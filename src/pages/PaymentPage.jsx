@@ -25,6 +25,14 @@ function buildWhatsAppUrl(message) {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
+function safeSessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Navigation still works if browser storage is unavailable.
+  }
+}
+
 export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,15 +126,18 @@ export default function PaymentPage() {
         },
         onLoad: () => setPayStatus(`${methodConfig.label} checkout loaded. Complete payment in the Paystack popup.`),
         onSuccess: (transaction) => {
+          const payment = {
+            method: `Paystack ${methodConfig.label}`,
+            reference: transaction.reference,
+            paidAt: new Date().toISOString(),
+          };
           setPayStatus("Payment received. Redirecting to onboarding...");
+          safeSessionSet("abraham_applicant", JSON.stringify(applicant));
+          safeSessionSet("abraham_payment", JSON.stringify(payment));
           navigate("/onboarding", {
             state: {
               applicant,
-              payment: {
-                method: `Paystack ${methodConfig.label}`,
-                reference: transaction.reference,
-                paidAt: new Date().toISOString(),
-              },
+              payment,
             },
           });
         },
@@ -150,15 +161,7 @@ export default function PaymentPage() {
           ) : (
             <>
               <p className="mb-2 text-xs uppercase tracking-[0.08em] text-white/80">Your slot is secured for</p>
-              <div className="mx-auto grid max-w-[21rem] grid-cols-2 gap-2 sm:flex sm:max-w-none sm:items-center sm:justify-center">
-                <TimeBox value={pad(timeLeft.days)} label="DAY" />
-                <span className="hidden text-3xl font-bold text-orange-fire sm:inline">:</span>
-                <TimeBox value={pad(timeLeft.hours)} label="HRS" />
-                <span className="hidden text-3xl font-bold text-orange-fire sm:inline">:</span>
-                <TimeBox value={pad(timeLeft.minutes)} label="MIN" />
-                <span className="hidden text-3xl font-bold text-orange-fire sm:inline">:</span>
-                <TimeBox value={pad(timeLeft.seconds)} label="SEC" />
-              </div>
+              <PaymentCountdownBoxes timeLeft={timeLeft} />
               <p className="mt-2 text-sm italic text-white/70">Complete payment to permanently secure your slot.</p>
             </>
           )}
@@ -274,6 +277,23 @@ function TimeBox({ value, label }) {
     <div className="min-w-[70px] rounded-xl bg-black/30 px-4 py-2 text-center">
       <div className="text-3xl font-bold leading-none tabular-nums text-orange-warm">{value}</div>
       <div className="mt-1 text-[0.65rem] uppercase tracking-[0.08em] text-white/60">{label}</div>
+    </div>
+  );
+}
+
+function PaymentCountdownBoxes({ timeLeft }) {
+  const boxes = timeLeft.days > 0
+    ? [["DAY", pad(timeLeft.days)], ["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]]
+    : [["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
+
+  return (
+    <div className={`mx-auto grid gap-2 sm:flex sm:max-w-none sm:items-center sm:justify-center ${timeLeft.days > 0 ? "max-w-[21rem] grid-cols-2" : "max-w-[18rem] grid-cols-3"}`}>
+      {boxes.map(([label, value], index) => (
+        <React.Fragment key={label}>
+          {index > 0 && <span className="hidden text-3xl font-bold text-orange-fire sm:inline">:</span>}
+          <TimeBox value={value} label={label} />
+        </React.Fragment>
+      ))}
     </div>
   );
 }

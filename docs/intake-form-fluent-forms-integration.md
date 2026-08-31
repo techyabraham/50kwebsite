@@ -36,12 +36,12 @@ The bridge exposes this REST endpoint:
 https://elements.abraham.com.ng/wp-json/abraham/v1/intake
 ```
 
-By default, the intake endpoint submits into Fluent Form ID `11`.
+By default, the intake endpoint submits into Fluent Form ID `12`.
 
 If your Fluent Forms onboarding form has a different ID, change this line in `wordpress/abraham-form-bridge.php`:
 
 ```php
-$form_id = 11;
+$form_id = 12;
 ```
 
 ## Fluent Forms Field Names
@@ -62,6 +62,9 @@ tone
 colors
 inspiration
 file_names
+logo_uploads
+website_uploads
+receipt_uploads
 instagram
 facebook
 tiktok
@@ -85,10 +88,13 @@ audience: Paragraph text
 goal: Text input
 services: Paragraph text
 pages: Paragraph text
-tone: Text input
+tone: Text input, optional
 colors: Text input
 inspiration: URL input or text input
 file_names: Paragraph text
+logo_uploads: Paragraph text
+website_uploads: Paragraph text
+receipt_uploads: Paragraph text
 instagram: Text input
 facebook: Text input
 tiktok: Text input
@@ -100,18 +106,32 @@ paid_at: Text input
 source: Text input
 ```
 
-## File Upload Note
+## File Uploads
 
-The React onboarding page currently records selected file names in `file_names`. It does not upload the actual logo/photo files to WordPress yet.
+The React onboarding page submits uploads as multipart form data:
 
-For now, ask customers to send real logo/photo files to WhatsApp after submitting the brief. This keeps the flow simple and reliable.
+```text
+logo_uploads[]
+website_uploads[]
+receipt_uploads[]
+```
 
-If you later want true file uploads inside Fluent Forms, add a multipart upload endpoint to the WordPress bridge and map uploaded files into Fluent Forms media/file fields.
+The WordPress bridge saves those files into the WordPress Media Library, then stores the uploaded media URLs in these Fluent Forms fields:
+
+```text
+logo_uploads
+website_uploads
+receipt_uploads
+```
+
+For customers redirected from successful Paystack payment, `receipt_uploads` is hidden because the Paystack reference is already included in `payment_reference`.
+
+Make sure the Fluent Forms `tone` field is not marked as required. The React form lets customers either choose a tone, type a custom tone, or leave it blank for Abraham to decide.
 
 ## Test Checklist
 
 1. Visit `/onboarding` directly.
 2. Fill the form and submit.
-3. Confirm the submission appears under Fluent Forms form ID `11`.
+3. Confirm the submission appears under Fluent Forms form ID `12`.
 4. Complete a Paystack test payment from `/payment`.
 5. Confirm Paystack redirects to `/onboarding` with payment reference shown at the top.

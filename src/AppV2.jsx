@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -10,7 +10,7 @@ import "swiper/css/pagination";
 import { FLUENT_FORMS_URL, INITIAL_SLOTS, OFFER_END_DATE, WHATSAPP_NUMBER } from "./constants";
 import { OFFER_END_COPY, OFFER_END_SHORT } from "./utils/formatDate";
 import { getSmartTimeLabel } from "./utils/getTimeLabel";
-import { decrementSlot, getSlotsRemaining } from "./utils/slots";
+import { decrementRemoteSlot, fetchSlotsRemaining, getSlotsRemaining } from "./utils/slots";
 import ReminderButton from "./components/ReminderButton";
 
 const easeOut = [0.22, 1, 0.36, 1];
@@ -48,10 +48,11 @@ const offerItems = [
 
 const testimonials = [
   {
-    quote: "After Abraham built my website, customers started finding me online who had never heard of me before. My revenue went up noticeably in the first month. I wish I had done this years ago.",
-    name: "[Client Name]",
-    business: "[Business Name]",
-    city: "[City]",
+    quote: "Abraham is the GURU when it comes to anything website and tech.... <br>His delivery is so excellent and impeccable that I make so much money working with him because he delivers a 100%. Anything Website, I highly highly recommend  Abraham because he is so good at what he does.... His teachings, his prompt response to any complaints, his services and delivery is the best and it is top notch! Tech Bro as I always call you, you are so good at what you do, no caps!!! I always recommend him to my clients all the time! If you are looking for someone to train you on website design, teach you or even handle anything related to website, I highly recommend Abraham Akomolafe and i believe EVERYONE should work with the best and he is the BEST in this field!!!",
+    name: "Winner Ezekiel",
+    business: "Millenial CEOs",
+    city: "Lagos",
+    image: "/images/winner-ezekiel.jpg",
   },
   {
     quote: "I used to tell people I had a business. Now I send them a link. That one change, sending someone a link instead of trying to explain, changed how people see what I do.",
@@ -145,7 +146,11 @@ function scrollToForm() {
 }
 
 function CountdownText({ timeLeft }) {
-  return <span className="whitespace-nowrap tabular-nums text-orange-warm">{pad(timeLeft.days)}:{pad(timeLeft.hours)}:{pad(timeLeft.minutes)}:{pad(timeLeft.seconds)}</span>;
+  const parts = timeLeft.days > 0
+    ? [pad(timeLeft.days), pad(timeLeft.hours), pad(timeLeft.minutes), pad(timeLeft.seconds)]
+    : [pad(timeLeft.hours), pad(timeLeft.minutes), pad(timeLeft.seconds)];
+
+  return <span className="whitespace-nowrap tabular-nums text-orange-warm">{parts.join(":")}</span>;
 }
 
 function CtaButton({ expired, children = "→ Reserve My Slot Now", variant = "orange" }) {
@@ -228,7 +233,7 @@ function NavBar() {
           ))}
         </div>
         <button className="mobile-nav-toggle hidden rounded-lg border border-purple-bright/50 px-3 py-2 text-lg text-white" onClick={() => setMobileOpen((value) => !value)}>
-          {mobileOpen ? "✕" : "☰"}
+          {mobileOpen ? "×" : "☰"}
         </button>
       </div>
       {mobileOpen && (
@@ -245,9 +250,11 @@ function NavBar() {
 }
 
 function CountdownBoxes({ timeLeft }) {
-  const boxes = [["DAYS", pad(timeLeft.days)], ["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
+  const boxes = timeLeft.days > 0
+    ? [["DAYS", pad(timeLeft.days)], ["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]]
+    : [["HRS", pad(timeLeft.hours)], ["MIN", pad(timeLeft.minutes)], ["SEC", pad(timeLeft.seconds)]];
   return (
-    <div className="mx-auto grid max-w-[22rem] grid-cols-2 gap-2 sm:flex sm:max-w-none sm:items-center sm:justify-center">
+    <div className={`mx-auto grid gap-2 sm:flex sm:max-w-none sm:items-center sm:justify-center ${timeLeft.days > 0 ? "max-w-[22rem] grid-cols-2" : "max-w-[18rem] grid-cols-3"}`}>
       {boxes.map(([label, value], index) => (
         <React.Fragment key={label}>
           {index > 0 && <span className="hidden text-4xl font-bold text-orange-fire sm:inline">:</span>}
@@ -453,11 +460,35 @@ function TestimonialsSection() {
 
 function TestimonialCard({ testimonial, index }) {
   const initial = testimonial.name.replace("[", "").trim().charAt(0) || "C";
-  return <motion.div initial={{ opacity: 0, scale: 0.92 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }} className="grid min-h-[400px] overflow-hidden rounded-[24px] shadow-[0_20px_60px_rgba(61,0,102,0.15)] md:grid-cols-[55fr_45fr]"><div className="flex flex-col justify-between bg-purple-deep p-7 md:p-12"><div className="text-8xl font-bold leading-none text-orange-fire/80">"</div><p className="mb-8 flex-1 text-[1.1rem] italic leading-[1.75] text-light-text">{testimonial.quote}</p><div className="flex items-center gap-4"><div className="flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-orange-fire bg-gradient-to-br from-orange-fire to-orange-warm text-xl font-bold text-white">{initial}</div><div><div className="font-semibold text-white">{testimonial.name}</div><div className="text-sm text-orange-warm">{testimonial.business} · {testimonial.city}</div><div className="mt-1 text-sm text-orange-warm">★★★★★</div></div></div></div><div className="relative min-h-[200px] overflow-hidden"><div className="flex h-full min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-purple-mid to-purple-deep text-sm text-white/35">[ Client / Business Photo {index + 1} ]</div><div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(61,0,102,0.3)_0%,transparent_100%)]" /></div></motion.div>;
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.92 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }} className="grid min-h-[400px] overflow-hidden rounded-[24px] shadow-[0_20px_60px_rgba(61,0,102,0.15)] md:grid-cols-[55fr_45fr]">
+      <div className="flex flex-col justify-between bg-purple-deep p-7 md:p-12">
+        <div className="text-8xl font-bold leading-none text-orange-fire/80">"</div>
+        <p className="mb-8 flex-1 text-[1.1rem] italic leading-[1.75] text-light-text">{testimonial.quote}</p>
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-orange-fire bg-gradient-to-br from-orange-fire to-orange-warm text-xl font-bold text-white">
+            {testimonial.image ? <img src={testimonial.image} alt={testimonial.name} className="h-full w-full object-cover" /> : initial}
+          </div>
+          <div>
+            <div className="font-semibold text-white">{testimonial.name}</div>
+            <div className="text-sm text-orange-warm">{testimonial.business} · {testimonial.city}</div>
+            <div className="mt-1 text-sm text-orange-warm">★★★★★</div>
+          </div>
+        </div>
+      </div>
+      <div className="relative min-h-[260px] overflow-hidden bg-purple-deep">
+        {testimonial.image ? (
+          <img src={testimonial.image} alt={`${testimonial.name} testimonial`} className="h-full min-h-[260px] w-full object-cover object-top" />
+        ) : (
+          <div className="flex h-full min-h-[260px] w-full items-center justify-center bg-gradient-to-br from-purple-mid to-purple-deep text-sm text-white/35">[ Client / Business Photo {index + 1} ]</div>
+        )}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(61,0,102,0.35)_0%,transparent_100%)]" />
+      </div>
+    </motion.div>
+  );
 }
-
 function StatsBar() {
-  return <div className="mt-10 grid overflow-hidden rounded-2xl bg-purple-deep md:grid-cols-4"><StatsBarItem number={20} suffix="+" label="Slots Available" /><StatsBarItem number={19} suffix="" label="Years Experience" /><StatsBarItem number={300} suffix="K" prefix="₦" label="Amount You Save" /><StatsBarItem number={48} suffix="hrs" label="Offer Window" /></div>;
+  return <div className="mt-10 grid overflow-hidden rounded-2xl bg-purple-deep md:grid-cols-4"><StatsBarItem number={20} suffix="+" label="Slots Available" /><StatsBarItem number={19} suffix="" label="Years Experience" /><StatsBarItem number={300} suffix="K" prefix="₦" label="Amount You Save" /><StatsBarItem number={7} suffix="" label="September Deadline" /></div>;
 }
 
 function StatsBarItem({ number, suffix, prefix = "", label }) {
@@ -598,7 +629,19 @@ export default function LandingPage() {
   const [slotsRemaining, setSlotsRemaining] = useState(() => getSlotsRemaining());
   const timeLeft = useCountdown(OFFER_END_DATE);
   const shared = useMemo(() => ({ slotsRemaining, timeLeft }), [slotsRemaining, timeLeft]);
-  const handleSlotReserved = () => setSlotsRemaining(decrementSlot());
+  const handleSlotReserved = () => {
+    decrementRemoteSlot().then(setSlotsRemaining);
+  };
+
+  useEffect(() => {
+    let active = true;
+    fetchSlotsRemaining().then((slots) => {
+      if (active) setSlotsRemaining(slots);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <main className="min-h-screen bg-off-white font-sans text-dark-text">
@@ -621,3 +664,5 @@ export default function LandingPage() {
     </main>
   );
 }
+
+
